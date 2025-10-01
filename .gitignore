@@ -1,4 +1,4 @@
-# Python
+# Python cache
 __pycache__/
 *.py[cod]
 *.pyo
@@ -15,7 +15,22 @@ db.sqlite3
 media/
 staticfiles/
 
-# Virtual env
+# Envs
+.env
+*.env
+
+# Virtual environments
 venv/
 env/
 ENV/
+.venv/
+
+# IDE/editor configs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# System files
+.DS_Store
+Thumbs.db
