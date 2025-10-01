@@ -83,7 +83,13 @@ async def start(message: types.Message, state: FSMContext):
         )
         await state.set_state(RegistrationState.user_type)
     else:
-        driver_status = get_driver_by_id(user_id)[4] if is_driver(user_id) else None
+        driver = get_driver_by_id(user_id)
+
+        if driver:  # agar topilgan bo‘lsa
+            driver_status = driver[4]   # indeks yoki ustun nomi bo‘yicha oling
+        else:
+            driver_status = None
+
         await show_main_menu(message, user_id, driver_status)
 
 async def show_main_menu(message: types.Message, user_id: int, driver_status: str = None):
@@ -208,7 +214,7 @@ async def set_license_number(message: types.Message, state: FSMContext):
         return await message.answer("❌ Ro'yxatdan o'tish bekor qilindi.", reply_markup=types.ReplyKeyboardRemove())
 
     await state.update_data(license_number=message.text)
-    await message.answer("📸 Haydovchi guvohnomasining rasmini yuboring:")
+    await message.answer_photo( photo="AgACAgIAAxkBAAITqWjdNuGR5ogXTAJUZxqEyGYhCOHCAALe9DEbL97xSqBNbI7Jz920AQADAgADeQADNgQ",caption="🔎 Namuna kabi haydovchilik guvohnomangiz bilan rasmga tushib yuboring.")
     await state.set_state(DriverRegistrationState.license_photo)
 
 # Haydovchi ro'yxati (guvohnoma rasmi)
@@ -288,13 +294,14 @@ async def confirm_driver_registration(callback: types.CallbackQuery, state: FSMC
 
         # Adminga yuborish
         try:
-            await callback.bot.send_message(ADMIN_ID, driver_text, parse_mode="HTML")
-            await callback.bot.send_photo(ADMIN_ID, data['license_photo'])
-            kb = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text=BUTTON_APPROVE, callback_data=f"approve_driver_{callback.from_user.id}")],
-                [InlineKeyboardButton(text=BUTTON_REJECT, callback_data=f"reject_driver_{callback.from_user.id}")]
-            ])
-            await callback.bot.send_message(ADMIN_ID, "Haydovchini tasdiqlash yoki rad etish:", reply_markup=kb)
+            for admin_id in ADMIN_ID:
+                await callback.bot.send_message(admin_id, driver_text, parse_mode="HTML")
+                await callback.bot.send_photo(admin_id, data['license_photo'])
+                kb = InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text=BUTTON_APPROVE, callback_data=f"approve_driver_{callback.from_user.id}")],
+                    [InlineKeyboardButton(text=BUTTON_REJECT, callback_data=f"reject_driver_{callback.from_user.id}")]
+                ])
+                await callback.bot.send_message(admin_id, "Haydovchini tasdiqlash yoki rad etish:", reply_markup=kb)
         except Exception as e:
             logger.error(f"Error sending to admin: {str(e)}")
             await callback.message.answer(f"⚠️ Xatolik: Admin bilan bog‘lanishda muammo: {str(e)}")

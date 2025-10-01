@@ -370,22 +370,24 @@ async def confirm_order(callback: types.CallbackQuery, state: FSMContext):
 
         # Admin va guruhga yuborish
         try:
-            if data.get('photo_id'):
-                await callback.bot.send_photo(
-                    chat_id=ADMIN_ID,
-                    photo=data['photo_id'],
-                    caption=order_text,
-                    parse_mode="HTML"
-                )
-            else:
-                await callback.bot.send_message(ADMIN_ID, order_text, parse_mode="HTML")
-            await callback.bot.send_location(chat_id=ADMIN_ID, latitude=data['latitude'], longitude=data['longitude'])
+            for admin_id in ADMIN_ID:
+                if data.get('photo_id'):
+                    await callback.bot.send_photo(
+                        chat_id=admin_id,
+                        photo=data['photo_id'],
+                        caption=order_text,
+                        parse_mode="HTML"
+                    )
+                else:
+                    await callback.bot.send_message(admin_id, order_text, parse_mode="HTML")
+                await callback.bot.send_location(chat_id=admin_id, latitude=data['latitude'], longitude=data['longitude'])
             
             # Guruhga (haydovchilar uchun)
             await callback.bot.send_message(GROUP_ID, order_text, parse_mode="HTML")
             await callback.bot.send_location(GROUP_ID, data['latitude'], data['longitude'])
             if data.get('photo_id'):
                 await callback.bot.send_photo(GROUP_ID, data['photo_id'])
+
         except Exception as e:
             logger.error(f"Error sending order to admin/group: {str(e)}")
             await callback.message.answer(f"⚠️ Xatolik: {str(e)}")
