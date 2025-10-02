@@ -209,25 +209,13 @@ async def set_custom_vehicle_type(message: types.Message, state: FSMContext):
 @router.message(DriverRegistrationState.license_number)
 async def set_license_number(message: types.Message, state: FSMContext):
     """Haydovchi guvohnomasi raqamini qayta ishlaydi."""
-    file_id = message.photo[-1].file_id
-    await message.answer(f"🖼 Siz yuborgan rasmning file_id:\n\n<code>{file_id}</code>", parse_mode="HTML")
-    
     if message.text == BUTTON_CANCEL:
         await state.clear()
         return await message.answer("❌ Ro'yxatdan o'tish bekor qilindi.", reply_markup=types.ReplyKeyboardRemove())
 
     await state.update_data(license_number=message.text)
-    # await message.answer_photo( photo="AgACAgIAAxkBAAITqWjdNuGR5ogXTAJUZxqEyGYhCOHCAALe9DEbL97xSqBNbI7Jz920AQADAgADeQADNgQ",caption="🔎 Namuna kabi haydovchilik guvohnomangiz bilan rasmga tushib yuboring.")
+    await message.answer_photo( photo="AgACAgIAAxkBAAIIe2jd8m9-aNm-ZIpis-ZvBffom29KAAL59jEb3KvwShWAgb-QASgbAQADAgADeAADNgQ",caption="🔎 Namuna kabi haydovchilik guvohnomangiz bilan rasmga tushib yuboring.")
     await state.set_state(DriverRegistrationState.license_photo)
-
-from aiogram import Router
-from aiogram.types import Message
-
-# @router.message(lambda message: message.photo)
-# async def get_photo_id(message: Message):
-#     # oxirgi (eng katta sifatli) rasmni olish
-#     file_id = message.photo[-1].file_id
-#     await message.answer(f"🖼 Siz yuborgan rasmning file_id:\n\n<code>{file_id}</code>", parse_mode="HTML")
 
 # Haydovchi ro'yxati (guvohnoma rasmi)
 @router.message(DriverRegistrationState.license_photo)
