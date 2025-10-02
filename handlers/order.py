@@ -45,12 +45,20 @@ def create_keyboard(items: list, columns: int = 2, add_cancel: bool = True) -> R
 async def order_start(message: types.Message, state: FSMContext):
     """Buyurtma berish jarayonini boshlaydi."""
     user_id = message.from_user.id
+    # Agar ro'yxatdan o'tmagan bo'lsa
     if not is_user_registered(user_id):
         return await message.answer("Iltimos, avval ro'yxatdan o'ting! /start")
     
-    if is_driver(user_id) and get_driver_by_id(user_id)[4] != "approved":
-        return await message.answer("⏳ Buyurtma berish uchun admin tasdiqini kuting.")
-
+    # Agar driver bo'lsa, lekin hali approved emas
+    if is_driver(user_id):
+        driver = get_driver_by_id(user_id)
+        if driver is None:
+            return await message.answer("Sizning profilingizda muammo bor. Iltimos, qayta urinib ko'ring.")
+        
+        if driver[4] != "approved":
+            return await message.answer("⏳ Buyurtma berish uchun admin tasdiqini kuting.")
+    
+    # Keyingi bosqich: viloyat tanlash
     kb = create_keyboard(viloyatlar, columns=2)
     await message.answer("🏙️ Yuk qaysi viloyatdan jo'natiladi?", reply_markup=kb)
     await state.set_state(OrderState.from_viloyat)

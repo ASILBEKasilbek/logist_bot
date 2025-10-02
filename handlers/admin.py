@@ -15,14 +15,23 @@ MSG_NO_ACCESS = "❌ Siz admin emassiz!"
 MSG_NO_USERS = "❌ Foydalanuvchilar topilmadi."
 MSG_NO_ORDERS = "❌ Buyurtmalar topilmadi."
 
-# Admin tekshiruvi dekoratori
 def admin_only(func):
     """Faqat admin uchun ruxsat beruvchi dekorator."""
-    async def wrapper(message: types.Message, *args, **kwargs):
-        if message.from_user.id != ADMIN_ID:
+    async def wrapper(*args, **kwargs):
+        # Aiogram 3.x handlerlarida birinchi argument odatda message yoki event bo'ladi
+        message = kwargs.get("message") or (args[0] if args else None)
+
+        if message is None:
+            # Agar message topilmasa, xatolikni oldini olish
+            return
+
+        if message.from_user.id not in ADMIN_ID:
             await message.answer(MSG_NO_ACCESS)
             return
-        return await func(message, *args, **kwargs)
+
+        # Barcha args va kwargs bilan func ni chaqiramiz
+        return await func(*args, **kwargs)
+
     return wrapper
 
 # Admin panel klaviaturasi
@@ -39,14 +48,14 @@ def get_admin_keyboard() -> ReplyKeyboardMarkup:
 # Admin panel
 @admin_router.message(Command("admin"))
 @admin_only
-async def admin_panel(message: types.Message):
+async def admin_panel(message: types.Message, **kwargs):
     """Admin panelini ko'rsatadi."""
     await message.answer("📊 Admin paneli:", reply_markup=get_admin_keyboard())
 
 # Statistika
 @admin_router.message(Command("stats"))
 @admin_only
-async def stats(message: types.Message):
+async def stats(message: types.Message, **kwargs):
     """Bot statistikasini ko'rsatadi."""
     stats = get_statistics()
     if not stats:
@@ -63,7 +72,7 @@ async def stats(message: types.Message):
 # Foydalanuvchilar ro'yxati
 @admin_router.message(Command("users"))
 @admin_only
-async def list_users(message: types.Message):
+async def list_users(message: types.Message, **kwargs):
     """Barcha foydalanuvchilar ro'yxatini ko'rsatadi."""
     users = get_all_users()
     if not users:
@@ -80,7 +89,7 @@ async def list_users(message: types.Message):
         )
     
     # Agar xabar juda uzun bo'lsa, qismlarga bo'lib yuborish
-    if len(text) > 4000:  # Telegram xabar uzunligi cheklovi ~4096
+    if len(text) > 4000:
         for i in range(0, len(text), 4000):
             await message.answer(text[i:i+4000])
     else:
@@ -89,7 +98,7 @@ async def list_users(message: types.Message):
 # Buyurtmalar ro'yxati
 @admin_router.message(Command("orders"))
 @admin_only
-async def list_orders(message: types.Message):
+async def list_orders(message: types.Message, **kwargs):
     """Barcha buyurtmalar ro'yxatini ko'rsatadi."""
     orders = get_all_orders()
     if not orders:
@@ -113,7 +122,6 @@ async def list_orders(message: types.Message):
             f"🕒 Yaratilgan: {order[12]}\n\n"
         )
     
-    # Agar xabar juda uzun bo'lsa, qismlarga bo'lib yuborish
     if len(text) > 4000:
         for i in range(0, len(text), 4000):
             await message.answer(text[i:i+4000])

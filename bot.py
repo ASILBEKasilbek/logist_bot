@@ -19,9 +19,9 @@ async def main():
     init_db()
     
     # Register handlers
-    register_order_handlers(dp)
     register_admin_handlers(dp)
     register_user_handlers(dp)
+    register_order_handlers(dp)
     
     try:
         await dp.start_polling(bot)
