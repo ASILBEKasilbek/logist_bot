@@ -197,9 +197,6 @@ async def set_vehicle_type(message: types.Message, state: FSMContext):
 @router.message(DriverRegistrationState.custom_vehicle_type)
 async def set_custom_vehicle_type(message: types.Message, state: FSMContext):
     """Maxsus avtomobil turini qayta ishlaydi."""
-    file_id = message.photo[-1].file_id
-    await message.answer(f"🖼 Siz yuborgan rasmning file_id:\n\n<code>{file_id}</code>", parse_mode="HTML")
-    
     if message.text == BUTTON_CANCEL:
         await state.clear()
         return await message.answer("❌ Ro'yxatdan o'tish bekor qilindi.", reply_markup=types.ReplyKeyboardRemove())
@@ -212,12 +209,15 @@ async def set_custom_vehicle_type(message: types.Message, state: FSMContext):
 @router.message(DriverRegistrationState.license_number)
 async def set_license_number(message: types.Message, state: FSMContext):
     """Haydovchi guvohnomasi raqamini qayta ishlaydi."""
+    file_id = message.photo[-1].file_id
+    await message.answer(f"🖼 Siz yuborgan rasmning file_id:\n\n<code>{file_id}</code>", parse_mode="HTML")
+    
     if message.text == BUTTON_CANCEL:
         await state.clear()
         return await message.answer("❌ Ro'yxatdan o'tish bekor qilindi.", reply_markup=types.ReplyKeyboardRemove())
 
     await state.update_data(license_number=message.text)
-    await message.answer_photo( photo="AgACAgIAAxkBAAITqWjdNuGR5ogXTAJUZxqEyGYhCOHCAALe9DEbL97xSqBNbI7Jz920AQADAgADeQADNgQ",caption="🔎 Namuna kabi haydovchilik guvohnomangiz bilan rasmga tushib yuboring.")
+    # await message.answer_photo( photo="AgACAgIAAxkBAAITqWjdNuGR5ogXTAJUZxqEyGYhCOHCAALe9DEbL97xSqBNbI7Jz920AQADAgADeQADNgQ",caption="🔎 Namuna kabi haydovchilik guvohnomangiz bilan rasmga tushib yuboring.")
     await state.set_state(DriverRegistrationState.license_photo)
 
 from aiogram import Router
