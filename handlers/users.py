@@ -197,6 +197,9 @@ async def set_vehicle_type(message: types.Message, state: FSMContext):
 @router.message(DriverRegistrationState.custom_vehicle_type)
 async def set_custom_vehicle_type(message: types.Message, state: FSMContext):
     """Maxsus avtomobil turini qayta ishlaydi."""
+    file_id = message.photo[-1].file_id
+    await message.answer(f"🖼 Siz yuborgan rasmning file_id:\n\n<code>{file_id}</code>", parse_mode="HTML")
+    
     if message.text == BUTTON_CANCEL:
         await state.clear()
         return await message.answer("❌ Ro'yxatdan o'tish bekor qilindi.", reply_markup=types.ReplyKeyboardRemove())
@@ -220,11 +223,11 @@ async def set_license_number(message: types.Message, state: FSMContext):
 from aiogram import Router
 from aiogram.types import Message
 
-@router.message(lambda message: message.photo)
-async def get_photo_id(message: Message):
-    # oxirgi (eng katta sifatli) rasmni olish
-    file_id = message.photo[-1].file_id
-    await message.answer(f"🖼 Siz yuborgan rasmning file_id:\n\n<code>{file_id}</code>", parse_mode="HTML")
+# @router.message(lambda message: message.photo)
+# async def get_photo_id(message: Message):
+#     # oxirgi (eng katta sifatli) rasmni olish
+#     file_id = message.photo[-1].file_id
+#     await message.answer(f"🖼 Siz yuborgan rasmning file_id:\n\n<code>{file_id}</code>", parse_mode="HTML")
 
 # Haydovchi ro'yxati (guvohnoma rasmi)
 @router.message(DriverRegistrationState.license_photo)
