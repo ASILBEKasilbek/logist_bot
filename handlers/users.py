@@ -335,7 +335,12 @@ async def handle_driver_approval(callback: types.CallbackQuery):
             if status == "approved":
                 await callback.bot.send_message(
                     user_id,
-                    "Siz endi buyurtmalarni qabul qilishingiz mumkin!"
+                    "✅ <b>Tabriklaymiz!</b>\n\n"
+                    "Siz <b>haydovchi</b> sifatida muvaffaqiyatli tasdiqlandingiz. 🚛\n\n"
+                    "📌 Endi buyurtmalarni qabul qilishingiz mumkin. Buning uchun quyidagi havolaga o‘ting 👇\n"
+                    "<a href='https://t.me/ShopirlarYuk'>🔗 Buyurtmalar kanali</a>\n\n"
+                    "⏳ Iltimos, biroz kuting — tez orada buyurtmalar paydo bo‘ladi."
+                    , parse_mode="HTML"
                 )
             await callback.message.edit_text(f"Haydovchi {status} qilindi.", reply_markup=None)
         except Exception as e:
