@@ -3,7 +3,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from states import OrderState
 from config import ADMIN_ID, GROUP_ID
-from database import is_user_registered, get_user_phone, save_order, is_driver, get_driver_by_id
+from database import is_user_registered, get_user_phone, save_order, is_driver, get_driver_by_id, register_user
 from regions import regions, viloyatlar
 from aiogram import Dispatcher
 import logging
@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 # Konstantalar
 BUTTON_CANCEL = "❌ Bekor qilish"
+BUTTON_BACK = "⬅️ Ortga qaytish"
 BUTTON_SKIP = "O'tkazib yuborish"
 BUTTON_ORDER = "🚚 Buyurtma berish"
 BUTTON_SHARE_PHONE = "📞 Telefon raqamni yuborish"
@@ -30,12 +31,14 @@ VEHICLE_TYPES = [
 ]
 
 # Umumiy klaviatura yaratish funksiyasi
-def create_keyboard(items: list, columns: int = 2, add_cancel: bool = True) -> ReplyKeyboardMarkup:
+def create_keyboard(items: list, columns: int = 2, add_cancel: bool = True, add_back: bool = False) -> ReplyKeyboardMarkup:
     """Dinamik klaviatura yaratadi."""
     kb_buttons = [
         [KeyboardButton(text=items[j]) for j in range(i, min(i + columns, len(items)))]
         for i in range(0, len(items), columns)
     ]
+    if add_back:
+        kb_buttons.append([KeyboardButton(text=BUTTON_BACK)])
     if add_cancel:
         kb_buttons.append([KeyboardButton(text=BUTTON_CANCEL)])
     return ReplyKeyboardMarkup(keyboard=kb_buttons, resize_keyboard=True)
@@ -70,6 +73,10 @@ async def set_from_viloyat(message: types.Message, state: FSMContext):
     if message.text == BUTTON_CANCEL:
         await state.clear()
         return await message.answer("❌ Buyurtma bekor qilindi.", reply_markup=types.ReplyKeyboardRemove())
+    
+    if message.text == BUTTON_BACK:
+        # Birinchi bosqichda ortga qaytish yo'q, shuning uchun faqat bekor qilish mumkin
+        return await message.answer("⬅️ Bu birinchi bosqich, ortga qaytib bo‘lmaydi. Iltimos, viloyat tanlang yoki bekor qiling.")
 
     viloyat = message.text.strip()
     if viloyat not in regions:
@@ -77,7 +84,7 @@ async def set_from_viloyat(message: types.Message, state: FSMContext):
 
     await state.update_data(from_viloyat=viloyat)
     tumanlar = regions[viloyat]
-    kb = create_keyboard(tumanlar, columns=2)
+    kb = create_keyboard(tumanlar, columns=2, add_back=True)
     await message.answer(f"🏘️ {viloyat}ning qaysi tumani/shahridan?", reply_markup=kb)
     await state.set_state(OrderState.from_tuman)
 
@@ -88,9 +95,16 @@ async def set_from_tuman(message: types.Message, state: FSMContext):
     if message.text == BUTTON_CANCEL:
         await state.clear()
         return await message.answer("❌ Buyurtma bekor qilindi.", reply_markup=types.ReplyKeyboardRemove())
+    
+    if message.text == BUTTON_BACK:
+        # Oldingi bosqichga qaytish (viloyat tanlash)
+        kb = create_keyboard(viloyatlar, columns=2)
+        await message.answer("🏙️ Yuk qaysi viloyatdan jo'natiladi?", reply_markup=kb)
+        await state.set_state(OrderState.from_viloyat)
+        return
 
     await state.update_data(from_tuman=message.text.strip())
-    kb = create_keyboard(viloyatlar, columns=2)
+    kb = create_keyboard(viloyatlar, columns=2, add_back=True)
     await message.answer("🏙️ Yuk qaysi viloyatga yetkaziladi?", reply_markup=kb)
     await state.set_state(OrderState.to_viloyat)
 
@@ -101,6 +115,16 @@ async def set_to_viloyat(message: types.Message, state: FSMContext):
     if message.text == BUTTON_CANCEL:
         await state.clear()
         return await message.answer("❌ Buyurtma bekor qilindi.", reply_markup=types.ReplyKeyboardRemove())
+    
+    if message.text == BUTTON_BACK:
+        # Oldingi bosqichga qaytish (yuborish tumani)
+        data = await state.get_data()
+        viloyat = data.get('from_viloyat')
+        tumanlar = regions[viloyat]
+        kb = create_keyboard(tumanlar, columns=2, add_back=True)
+        await message.answer(f"🏘️ {viloyat}ning qaysi tumani/shahridan?", reply_markup=kb)
+        await state.set_state(OrderState.from_tuman)
+        return
 
     viloyat = message.text.strip()
     if viloyat not in regions:
@@ -108,7 +132,7 @@ async def set_to_viloyat(message: types.Message, state: FSMContext):
 
     await state.update_data(to_viloyat=viloyat)
     tumanlar = regions[viloyat]
-    kb = create_keyboard(tumanlar, columns=2)
+    kb = create_keyboard(tumanlar, columns=2, add_back=True)
     await message.answer(f"🏘️ {viloyat}ning qaysi tumani/shahriga?", reply_markup=kb)
     await state.set_state(OrderState.to_tuman)
 
@@ -119,9 +143,16 @@ async def set_to_tuman(message: types.Message, state: FSMContext):
     if message.text == BUTTON_CANCEL:
         await state.clear()
         return await message.answer("❌ Buyurtma bekor qilindi.", reply_markup=types.ReplyKeyboardRemove())
+    
+    if message.text == BUTTON_BACK:
+        # Oldingi bosqichga qaytish (yetkazish viloyati)
+        kb = create_keyboard(viloyatlar, columns=2, add_back=True)
+        await message.answer("🏙️ Yuk qaysi viloyatga yetkaziladi?", reply_markup=kb)
+        await state.set_state(OrderState.to_viloyat)
+        return
 
     await state.update_data(to_tuman=message.text.strip())
-    await message.answer("📝 Buyurtma nomini (yuk tavsifini) kiriting:")
+    await message.answer("📝 Buyurtma nomini (yuk tavsifini) kiriting:", reply_markup=create_keyboard([], add_cancel=True, add_back=True))
     await state.set_state(OrderState.order_name)
 
 # Buyurtma nomi
@@ -131,12 +162,23 @@ async def set_order_name(message: types.Message, state: FSMContext):
     if message.text == BUTTON_CANCEL:
         await state.clear()
         return await message.answer("❌ Buyurtma bekor qilindi.", reply_markup=types.ReplyKeyboardRemove())
+    
+    if message.text == BUTTON_BACK:
+        # Oldingi bosqichga qaytish (yetkazish tumani)
+        data = await state.get_data()
+        viloyat = data.get('to_viloyat')
+        tumanlar = regions[viloyat]
+        kb = create_keyboard(tumanlar, columns=2, add_back=True)
+        await message.answer(f"🏘️ {viloyat}ning qaysi tumani/shahriga?", reply_markup=kb)
+        await state.set_state(OrderState.to_tuman)
+        return
 
     await state.update_data(order_name=message.text.strip())
     kb = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="5 kg"), KeyboardButton(text="10 kg"), KeyboardButton(text="20 kg")],
             [KeyboardButton(text="50 kg"), KeyboardButton(text="100 kg"), KeyboardButton(text="Boshqa")],
+            [KeyboardButton(text=BUTTON_BACK)],
             [KeyboardButton(text=BUTTON_CANCEL)],
         ],
         resize_keyboard=True
@@ -151,6 +193,12 @@ async def set_weight(message: types.Message, state: FSMContext):
     if message.text == BUTTON_CANCEL:
         await state.clear()
         return await message.answer("❌ Buyurtma bekor qilindi.", reply_markup=types.ReplyKeyboardRemove())
+    
+    if message.text == BUTTON_BACK:
+        # Oldingi bosqichga qaytish (buyurtma nomi)
+        await message.answer("📝 Buyurtma nomini (yuk tavsifini) kiriting:", reply_markup=create_keyboard([], add_cancel=True, add_back=True))
+        await state.set_state(OrderState.order_name)
+        return
 
     text = message.text.strip().replace(" kg", "")
     try:
@@ -159,7 +207,7 @@ async def set_weight(message: types.Message, state: FSMContext):
         return await message.answer("❌ Iltimos, faqat son kiriting (masalan: 20)!")
 
     await state.update_data(weight=weight)
-    kb = create_keyboard(VEHICLE_TYPES, columns=2)
+    kb = create_keyboard(VEHICLE_TYPES, columns=2, add_back=True)
     await message.answer("🚛 Qanday transport turi kerak?", reply_markup=kb)
     await state.set_state(OrderState.vehicle_type)
 
@@ -170,10 +218,25 @@ async def set_vehicle_type(message: types.Message, state: FSMContext):
     if message.text == BUTTON_CANCEL:
         await state.clear()
         return await message.answer("❌ Buyurtma bekor qilindi.", reply_markup=types.ReplyKeyboardRemove())
+    
+    if message.text == BUTTON_BACK:
+        # Oldingi bosqichga qaytish (yuk og'irligi)
+        kb = ReplyKeyboardMarkup(
+            keyboard=[
+                [KeyboardButton(text="5 kg"), KeyboardButton(text="10 kg"), KeyboardButton(text="20 kg")],
+                [KeyboardButton(text="50 kg"), KeyboardButton(text="100 kg"), KeyboardButton(text="Boshqa")],
+                [KeyboardButton(text=BUTTON_BACK)],
+                [KeyboardButton(text=BUTTON_CANCEL)],
+            ],
+            resize_keyboard=True
+        )
+        await message.answer("⚖️ Yukning og‘irligini tanlang yoki kiriting (kg):", reply_markup=kb)
+        await state.set_state(OrderState.weight)
+        return
 
     vehicle_type = message.text.strip()
     if vehicle_type == "Boshqa":
-        await message.answer("Iltimos, transport turini kiriting:")
+        await message.answer("Iltimos, transport turini kiriting:", reply_markup=create_keyboard([], add_cancel=True, add_back=True))
         await state.set_state(OrderState.custom_vehicle_type)
         return
 
@@ -184,6 +247,7 @@ async def set_vehicle_type(message: types.Message, state: FSMContext):
     kb = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text=BUTTON_SKIP)],
+            [KeyboardButton(text=BUTTON_BACK)],
             [KeyboardButton(text=BUTTON_CANCEL)],
         ],
         resize_keyboard=True
@@ -201,11 +265,19 @@ async def set_custom_vehicle_type(message: types.Message, state: FSMContext):
     if message.text == BUTTON_CANCEL:
         await state.clear()
         return await message.answer("❌ Buyurtma bekor qilindi.", reply_markup=types.ReplyKeyboardRemove())
+    
+    if message.text == BUTTON_BACK:
+        # Oldingi bosqichga qaytish (transport turi)
+        kb = create_keyboard(VEHICLE_TYPES, columns=2, add_back=True)
+        await message.answer("🚛 Qanday transport turi kerak?", reply_markup=kb)
+        await state.set_state(OrderState.vehicle_type)
+        return
 
     await state.update_data(vehicle_type=message.text.strip())
     kb = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text=BUTTON_SKIP)],
+            [KeyboardButton(text=BUTTON_BACK)],
             [KeyboardButton(text=BUTTON_CANCEL)],
         ],
         resize_keyboard=True
@@ -223,6 +295,18 @@ async def set_photo(message: types.Message, state: FSMContext):
     if message.text == BUTTON_CANCEL:
         await state.clear()
         return await message.answer("❌ Buyurtma bekor qilindi.", reply_markup=types.ReplyKeyboardRemove())
+    
+    if message.text == BUTTON_BACK:
+        # Oldingi bosqichga qaytish (transport turi yoki maxsus transport turi)
+        data = await state.get_data()
+        if data.get('vehicle_type') == "Boshqa":
+            await message.answer("Iltimos, transport turini kiriting:", reply_markup=create_keyboard([], add_cancel=True, add_back=True))
+            await state.set_state(OrderState.custom_vehicle_type)
+        else:
+            kb = create_keyboard(VEHICLE_TYPES, columns=2, add_back=True)
+            await message.answer("🚛 Qanday transport turi kerak?", reply_markup=kb)
+            await state.set_state(OrderState.vehicle_type)
+        return
 
     photo_id = None
     if message.photo:
@@ -234,6 +318,7 @@ async def set_photo(message: types.Message, state: FSMContext):
     kb = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text=BUTTON_SKIP)],
+            [KeyboardButton(text=BUTTON_BACK)],
             [KeyboardButton(text=BUTTON_CANCEL)],
         ],
         resize_keyboard=True
@@ -251,6 +336,23 @@ async def set_pickup_address(message: types.Message, state: FSMContext):
     if message.text == BUTTON_CANCEL:
         await state.clear()
         return await message.answer("❌ Buyurtma bekor qilindi.", reply_markup=types.ReplyKeyboardRemove())
+    
+    if message.text == BUTTON_BACK:
+        # Oldingi bosqichga qaytish (yuk rasmi)
+        kb = ReplyKeyboardMarkup(
+            keyboard=[
+                [KeyboardButton(text=BUTTON_SKIP)],
+                [KeyboardButton(text=BUTTON_BACK)],
+                [KeyboardButton(text=BUTTON_CANCEL)],
+            ],
+            resize_keyboard=True
+        )
+        await message.answer(
+            "📸 Yuk rasmini yuboring (ixtiyoriy). Yoki 'O'tkazib yuborish' ni tanlang.",
+            reply_markup=kb
+        )
+        await state.set_state(OrderState.photo)
+        return
 
     address = "Yo'q" if message.text.lower() == BUTTON_SKIP.lower() else message.text
     await state.update_data(pickup_address=address)
@@ -261,7 +363,11 @@ async def set_pickup_address(message: types.Message, state: FSMContext):
         await ask_for_location(message, state)
     else:
         kb = ReplyKeyboardMarkup(
-            keyboard=[[KeyboardButton(text=BUTTON_SHARE_PHONE, request_contact=True)]],
+            keyboard=[
+                [KeyboardButton(text=BUTTON_SHARE_PHONE, request_contact=True)],
+                [KeyboardButton(text=BUTTON_BACK)],
+                [KeyboardButton(text=BUTTON_CANCEL)],
+            ],
             resize_keyboard=True
         )
         await message.answer("📞 Telefon raqamingizni yuboring:", reply_markup=kb)
@@ -271,6 +377,27 @@ async def set_pickup_address(message: types.Message, state: FSMContext):
 @router.message(OrderState.phone)
 async def set_phone(message: types.Message, state: FSMContext):
     """Telefon raqamini qayta ishlaydi."""
+    if message.text == BUTTON_CANCEL:
+        await state.clear()
+        return await message.answer("❌ Buyurtma bekor qilindi.", reply_markup=types.ReplyKeyboardRemove())
+    
+    if message.text == BUTTON_BACK:
+        # Oldingi bosqichga qaytish (yukni olib ketish manzili)
+        kb = ReplyKeyboardMarkup(
+            keyboard=[
+                [KeyboardButton(text=BUTTON_SKIP)],
+                [KeyboardButton(text=BUTTON_BACK)],
+                [KeyboardButton(text=BUTTON_CANCEL)],
+            ],
+            resize_keyboard=True
+        )
+        await message.answer(
+            "📍 Yukni olib ketish manzilini kiriting (ixtiyoriy). Yoki 'O'tkazib yuborish' ni tanlang.",
+            reply_markup=kb
+        )
+        await state.set_state(OrderState.pickup_address)
+        return
+
     phone = message.contact.phone_number if message.contact else message.text
     if not phone:
         return await message.answer("❌ Iltimos, telefon raqamini yuboring!")
@@ -287,7 +414,11 @@ async def set_phone(message: types.Message, state: FSMContext):
 async def ask_for_location(message: types.Message, state: FSMContext):
     """Lokatsiya so'raydi."""
     kb = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text=BUTTON_SHARE_LOCATION, request_location=True)]],
+        keyboard=[
+            [KeyboardButton(text=BUTTON_SHARE_LOCATION, request_location=True)],
+            [KeyboardButton(text=BUTTON_BACK)],
+            [KeyboardButton(text=BUTTON_CANCEL)],
+        ],
         resize_keyboard=True
     )
     await message.answer("📍 Yukni olib ketish lokatsiyasini yuboring (joylashuvni yoqishni esdan chiqarmang!):", reply_markup=kb)
@@ -297,6 +428,40 @@ async def ask_for_location(message: types.Message, state: FSMContext):
 @router.message(OrderState.location)
 async def set_location(message: types.Message, state: FSMContext):
     """Yuborilgan lokatsiyani qayta ishlaydi."""
+    if message.text == BUTTON_CANCEL:
+        await state.clear()
+        return await message.answer("❌ Buyurtma bekor qilindi.", reply_markup=types.ReplyKeyboardRemove())
+    
+    if message.text == BUTTON_BACK:
+        # Oldingi bosqichga qaytish (telefon raqami yoki manzil)
+        phone = get_user_phone(message.from_user.id)
+        if phone:
+            kb = ReplyKeyboardMarkup(
+                keyboard=[
+                    [KeyboardButton(text=BUTTON_SKIP)],
+                    [KeyboardButton(text=BUTTON_BACK)],
+                    [KeyboardButton(text=BUTTON_CANCEL)],
+                ],
+                resize_keyboard=True
+            )
+            await message.answer(
+                "📍 Yukni olib ketish manzilini kiriting (ixtiyoriy). Yoki 'O'tkazib yuborish' ni tanlang.",
+                reply_markup=kb
+            )
+            await state.set_state(OrderState.pickup_address)
+        else:
+            kb = ReplyKeyboardMarkup(
+                keyboard=[
+                    [KeyboardButton(text=BUTTON_SHARE_PHONE, request_contact=True)],
+                    [KeyboardButton(text=BUTTON_BACK)],
+                    [KeyboardButton(text=BUTTON_CANCEL)],
+                ],
+                resize_keyboard=True
+            )
+            await message.answer("📞 Telefon raqamingizni yuboring:", reply_markup=kb)
+            await state.set_state(OrderState.phone)
+        return
+
     if not message.location:
         return await message.answer("❌ Iltimos, lokatsiya yuboring!")
 
@@ -323,7 +488,8 @@ async def set_location(message: types.Message, state: FSMContext):
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=BUTTON_CONFIRM_YES, callback_data="confirm_yes")],
-        [InlineKeyboardButton(text=BUTTON_CONFIRM_NO, callback_data="confirm_no")]
+        [InlineKeyboardButton(text=BUTTON_CONFIRM_NO, callback_data="confirm_no")],
+        [InlineKeyboardButton(text=BUTTON_BACK, callback_data="back_to_location")]
     ])
 
     await message.answer(text, reply_markup=kb)
@@ -401,9 +567,21 @@ async def confirm_order(callback: types.CallbackQuery, state: FSMContext):
             await callback.message.answer(f"⚠️ Xatolik: {str(e)}")
 
         await state.clear()
-    else:
+    elif callback.data == "confirm_no":
         await callback.message.edit_text("❌ Buyurtma bekor qilindi.", reply_markup=None)
         await state.clear()
+    elif callback.data == "back_to_location":
+        # Oldingi bosqichga qaytish (lokatsiya)
+        kb = ReplyKeyboardMarkup(
+            keyboard=[
+                [KeyboardButton(text=BUTTON_SHARE_LOCATION, request_location=True)],
+                [KeyboardButton(text=BUTTON_BACK)],
+                [KeyboardButton(text=BUTTON_CANCEL)],
+            ],
+            resize_keyboard=True
+        )
+        await callback.message.edit_text("📍 Yukni olib ketish lokatsiyasini yuboring (joylashuvni yoqishni esdan chiqarmang!):", reply_markup=kb)
+        await state.set_state(OrderState.location)
 
 def register_order_handlers(dp: Dispatcher):
     """Handlerlarni ro'yxatga oladi."""
