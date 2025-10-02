@@ -217,6 +217,15 @@ async def set_license_number(message: types.Message, state: FSMContext):
     await message.answer_photo( photo="AgACAgIAAxkBAAITqWjdNuGR5ogXTAJUZxqEyGYhCOHCAALe9DEbL97xSqBNbI7Jz920AQADAgADeQADNgQ",caption="🔎 Namuna kabi haydovchilik guvohnomangiz bilan rasmga tushib yuboring.")
     await state.set_state(DriverRegistrationState.license_photo)
 
+from aiogram import Router
+from aiogram.types import Message
+
+@router.message(lambda message: message.photo)
+async def get_photo_id(message: Message):
+    # oxirgi (eng katta sifatli) rasmni olish
+    file_id = message.photo[-1].file_id
+    await message.answer(f"🖼 Siz yuborgan rasmning file_id:\n\n<code>{file_id}</code>", parse_mode="HTML")
+
 # Haydovchi ro'yxati (guvohnoma rasmi)
 @router.message(DriverRegistrationState.license_photo)
 async def set_license_photo(message: types.Message, state: FSMContext):
